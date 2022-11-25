@@ -1,0 +1,8 @@
+name: colorcheck_env
+dependencies:
+  - python
+  - matplotlib
+  - pip
+  - pip:
+    - daltonlens
+    - colorspacious
