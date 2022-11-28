@@ -12,6 +12,11 @@ def simulate_cvd(img, cvd_type, severity):
     """
     Simulate various types of color vision deficiency (CVD) for a given image array.
 
+    The simulation approach is chosen the same way as in the `daltonlens` package:
+
+    - Tritanopia/Tritanomaly: Brettel 1997
+    - Deuteranopia/Protanopia: Viennot 1999
+    - Deuteranomaly/Protanomaly: Machado 2009
 
     Parameters
     ----------
@@ -52,7 +57,7 @@ def simulate_cvd(img, cvd_type, severity):
         img_cvd[:, :, 0:3] = colorspacious.cspace_convert(img_cvd[:, :, 0:3], "JCh", "sRGB1")
         return np.clip(img_cvd, 0, 1, out=img_cvd)
     else:
-        raise ValueError('cvd_type must be one of ("deutan", "protan", "tritan")')
+        raise ValueError('cvd_type must be one of ("deutan", "protan", "tritan", "mono")')
     
     img_cvd[:, :, 0:3] = simulator._simulate_cvd_linear_rgb(img_cvd[:, :, 0:3], deficiency, severity / 100)
 
