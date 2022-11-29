@@ -35,3 +35,7 @@ If you want to modify or extend the package, you can install it in develop mode 
 python -m pip install -e .
 ```
 instead.
+
+## License
+
+`colorcheck` is licensed under the MIT license. See [LICENSE](https://github.com/akvas/colorcheck/blob/10775428ac37802b3c796928237b2dfadca658e2/LICENSE)
