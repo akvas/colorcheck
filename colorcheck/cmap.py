@@ -5,6 +5,8 @@
 import numpy as np
 import colorspacious
 import matplotlib
+import scipy.interpolate
+import scipy.ndimage
 
 
 def is_colormap_like(cmap):
@@ -16,13 +18,13 @@ def is_colormap_like(cmap):
         cmap(0.5)
     except TypeError:
         return False
-    else: 
-        rgba = cmap((0.0, 0.5, 1.0)) 
+    else:
+        rgba = cmap((0.0, 0.5, 1.0))
         try:
             return np.all(rgba >= 0) and np.all(rgba <= 1)
         except TypeError:
-            return False 
-    
+            return False
+
 
 def cmap_rgba(cmap, width=640, height=80, orientation='horizontal'):
     """
@@ -31,7 +33,7 @@ def cmap_rgba(cmap, width=640, height=80, orientation='horizontal'):
     Parameters
     ----------
     cmap : colormap-like
-        Colormap-like object. 
+        Colormap-like object.
     width : int
         Width of the image array in pixels.
     height : int
@@ -42,7 +44,7 @@ def cmap_rgba(cmap, width=640, height=80, orientation='horizontal'):
     Returns
     -------
     img_array : ndarray(width, height, color.dimension)
-        Array representation of the colormap of the given size and orientation.    
+        Array representation of the colormap of the given size and orientation.
     """
     x = np.linspace(0, 1, width)
     arr = np.tile(cmap(x)[:, np.newaxis, :], (1, height, 1))
@@ -54,8 +56,8 @@ def cmap_rgba(cmap, width=640, height=80, orientation='horizontal'):
 
 def lightness(cmap, samples=256):
     """
-    Compute the lightness for each color in the colormap. The computed lightness is based on 
-    the CIECAM02-UCS color model. 
+    Compute the lightness for each color in the colormap. The computed lightness is based on
+    the CIECAM02-UCS color model.
 
     Parameters
     ----------
@@ -79,7 +81,7 @@ def lightness(cmap, samples=256):
     return lab[:, 0], colors
 
 
-def lightness_gradient(cmap, samples=256):
+def perceptual_gradient(cmap, samples=256):
     """
     Compute the lightness gradient :math:`\Delta E_\text{CIEDE2000}` between consecutive colors of the colormap.
 
@@ -104,7 +106,7 @@ def lightness_gradient(cmap, samples=256):
 
     dE = np.sum(np.gradient(lab, axis=0)**2, axis=1)
 
-    return dE, np.cumsum(dE) 
+    return dE, np.cumsum(dE)
 
 
 def equalize_cmap(cmap, metric='lightness'):
@@ -125,14 +127,14 @@ def equalize_cmap(cmap, metric='lightness'):
     """
     x = np.linspace(0, 1, cmap.N)
     colors = cmap(x)
-    rgb = colors[np.newaxis, :, :3] 
+    rgb = colors[np.newaxis, :, :3]
     lab = colorspacious.cspace_converter("sRGB1", "CAM02-UCS")(rgb)[0, :, :]
 
     if metric == 'lightness':
         dE = np.cumsum(np.abs(np.gradient(lab[:, 0])))
     elif metric == 'CIE76':
         dE = np.cumsum(np.sqrt(np.sum(np.gradient(lab, axis=0)**2, axis=1)))
-    else: 
+    else:
         raise ValueError('Metric must be one of "lightness" or "CIE76"')
 
     x_interp = np.interp(dE, np.linspace(dE[0], dE[-1], cmap.N), x)
@@ -176,3 +178,44 @@ def cmapshow(cmap, ax=None, width=640, height=80, orientation='horizontal'):
     im = ax.imshow(img)
 
     return im
+
+
+class ColormapLightness:
+
+    def __call__(self, x):
+        return self._lightness_map(x)
+
+
+class SequentialLightness(ColormapLightness):
+
+    def __init__(self, start_lightness=10, end_lightness=90):
+        self._lightness_map = scipy.interpolate.interp1d((0, 1), (start_lightness, end_lightness), bounds_error=True)
+
+
+class MultiSequentialLightness(ColormapLightness):
+
+    def __init__(self, segments, start_lightness=10, end_lightness=90):
+        self._backend = SequentialLightness(start_lightness, end_lightness)
+        self._segments = segments
+
+    def __call__(self, x):
+
+        arg = np.mod(x * self._segments, 1)
+        last_segment = x >= (self._segments - 1) / self._segments
+        arg[last_segment] = (x[last_segment] - (self._segments - 1) / self._segments) * self._segments
+        return self._backend(arg)
+
+
+class DivergingLightness(ColormapLightness):
+
+    def __init__(self, edge_lightness=10, center_lightness=90, smooth_center=False):
+
+        if smooth_center:
+            s1 = np.linspace(edge_lightness, center_lightness, 501)
+            s2 = np.linspace(s1[-2], edge_lightness, 500)
+            s_concat = np.concatenate((s1, s2))
+            s = scipy.ndimage.gaussian_filter1d(s_concat, s_concat.size / 20)
+            s_concat[int(s_concat.size / 4):int(3 / 4 * s_concat.size)] = s[int(s_concat.size / 4):int(3 / 4 * s_concat.size)]
+            self._lightness_map = scipy.interpolate.interp1d(np.linspace(0, 1, s_concat.size), s_concat, bounds_error=True)
+        else:
+            self._lightness_map = scipy.interpolate.interp1d((0, 0.5, 1), (edge_lightness, center_lightness, edge_lightness), bounds_error=True)

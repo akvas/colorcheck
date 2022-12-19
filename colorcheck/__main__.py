@@ -2,9 +2,8 @@
 # Copyright (C) 2022 Andreas Kvas
 # See LICENSE for detailed licensing information.
 
-
 import argparse
-import os 
+import os
 import matplotlib.pyplot
 from . import simulation
 
@@ -21,7 +20,7 @@ if __name__ == "__main__":
     for cvd_type in ('deutan', 'protan', 'tritan', 'mono'):
 
         file_path, ext = os.path.splitext(args.image)
-        output_filename = file_path + '.' + cvd_type + ext 
-        
+        output_filename = file_path + '.' + cvd_type + ext
+
         img_cvd = simulation.simulate_cvd(img, cvd_type, args.severity)
         matplotlib.pyplot.imsave(output_filename, img_cvd)
