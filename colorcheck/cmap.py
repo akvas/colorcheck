@@ -181,25 +181,34 @@ def cmapshow(cmap, ax=None, width=640, height=80, orientation='horizontal'):
 
 
 class ColormapLightness:
-
+    """
+    Class representation for pre-defined lightess curves in colormaps.
+    """
     def __call__(self, x):
+        """
+        Return the lightness value for a given color index.
+
+        Parameters
+        ----------
+        x : float
+            Color index in the range [0, 1].
+        """
         return self._lightness_map(x)
 
 
 class SequentialLightness(ColormapLightness):
-
+    """Linear lightness curve for sequential colormaps."""
     def __init__(self, start_lightness=10, end_lightness=90):
         self._lightness_map = scipy.interpolate.interp1d((0, 1), (start_lightness, end_lightness), bounds_error=True)
 
 
 class MultiSequentialLightness(ColormapLightness):
-
+    """Piecewise linear lightness curve for multi-sequential colormaps."""
     def __init__(self, segments, start_lightness=10, end_lightness=90):
         self._backend = SequentialLightness(start_lightness, end_lightness)
         self._segments = segments
 
     def __call__(self, x):
-
         arg = np.mod(x * self._segments, 1)
         last_segment = x >= (self._segments - 1) / self._segments
         arg[last_segment] = (x[last_segment] - (self._segments - 1) / self._segments) * self._segments
@@ -207,7 +216,7 @@ class MultiSequentialLightness(ColormapLightness):
 
 
 class DivergingLightness(ColormapLightness):
-
+    """Piecewise linear (optionally with a smoothed center) lightness curve for diverging colormaps."""
     def __init__(self, edge_lightness=10, center_lightness=90, smooth_center=False):
 
         if smooth_center:

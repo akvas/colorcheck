@@ -1,3 +1,7 @@
+# This file is part of colorcheck
+# Copyright (C) 2022 Andreas Kvas
+# See LICENSE for detailed licensing information.
+
 import matplotlib.colors
 import numpy as np
 import os
