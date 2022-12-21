@@ -9,6 +9,18 @@ import scipy.interpolate
 import scipy.ndimage
 
 
+_rgb2lab_converter = colorspacious.cspace_converter('sRGB1', 'CAM02-UCS')
+_lab2rgb_converter = colorspacious.cspace_converter('CAM02-UCS', 'sRGB1')
+
+
+def _rgb2lab(rgb):
+    return _rgb2lab_converter(rgb[np.newaxis, :, :3])[0, :, :]
+
+
+def _lab2rgb(lab):
+    return _lab2rgb_converter(lab[np.newaxis, :, :3])[0, :, :]
+
+
 def is_colormap_like(cmap):
     """Return whether an object is colormap-like."""
     if isinstance(cmap, matplotlib.colors.Colormap):
@@ -75,8 +87,7 @@ def lightness(cmap, samples=256):
     """
     x = np.linspace(0, 1, samples)
     colors = cmap(x)
-    rgb = colors[np.newaxis, :, :3]
-    lab = colorspacious.cspace_converter("sRGB1", "CAM02-UCS")(rgb)[0, :, :]
+    lab = _rgb2lab(colors[:, 0:3])
 
     return lab[:, 0], colors
 
@@ -101,12 +112,50 @@ def perceptual_gradient(cmap, samples=256):
     """
     x = np.linspace(0, 1, samples)
     colors = cmap(x)
-    rgb = colors[np.newaxis, :, :3]
-    lab = colorspacious.cspace_converter("sRGB1", "CAM02-UCS")(rgb)[0, :, :]
+    lab = _rgb2lab(colors[:, 0:3])
 
-    dE = np.sum(np.gradient(lab, axis=0)**2, axis=1)
+    dE = np.sqrt(np.sum(np.gradient(lab, axis=0)**2, axis=1))
 
     return dE, np.cumsum(dE)
+
+
+def replace_lightness(cmap, lightness_curve):
+
+    x = np.linspace(0, 1, cmap.N)
+    rgba = cmap(x)
+    lab = _rgb2lab(rgba[:, 0:3])
+    lab[:, 0] = lightness_curve(x)
+    rgb_new = rgba.copy()
+    rgb_new[:, 0:3] = _lab2rgb(lab)
+
+    valid_colors = np.all(np.logical_and(rgb_new >= 0, rgb_new <= 1), axis=1)
+
+    hue = np.arctan2(lab[:, 2], lab[:, 1])
+    chroma = np.sqrt(lab[:, 2]**2 + lab[:, 1]**2)
+    for k in range(x.size):
+        if valid_colors[k]:
+            continue
+
+        c = np.linspace(0, chroma[k])
+        candidates = np.empty((c.size, 3))
+        candidates[:, 0] = lab[k, 0]
+        candidates[:, 1] = c * np.cos(hue[k])
+        candidates[:, 2] = c * np.sin(hue[k])
+
+        rgb_tmp = _lab2rgb(candidates)
+        valid_candidates = np.all(np.logical_and(rgb_tmp >= 0, rgb_tmp <= 1), axis=1)
+        diff = candidates - lab[k:k + 1, :]
+        d = np.sqrt(np.sum(diff**2, axis=1))
+
+        lab[k, :] = candidates[valid_candidates, :][np.argmin(d[valid_candidates])]
+
+    rgb_new = rgba.copy()
+    rgb_new[:, 0:3] = _lab2rgb(lab)
+
+    if isinstance(cmap, matplotlib.colors.LinearSegmentedColormap):
+        return matplotlib.colors.LinearSegmentedColormap.from_list(cmap.name + '_lc', rgb_new)
+    elif isinstance(cmap, matplotlib.colors.ListedColormap):
+        return matplotlib.colors.ListedColormap(rgb_new, cmap.name + '_lc')
 
 
 def equalize_cmap(cmap, metric='lightness'):
