@@ -11,6 +11,7 @@ import scipy.ndimage
 
 _rgb2lab_converter = colorspacious.cspace_converter('sRGB1', 'CAM02-UCS')
 _lab2rgb_converter = colorspacious.cspace_converter('CAM02-UCS', 'sRGB1')
+_rgb2cielab_converter = colorspacious.cspace_converter('sRGB1', 'CIELab')
 
 
 def _rgb2lab(rgb):
@@ -92,9 +93,9 @@ def lightness(cmap, samples=256):
     return lab[:, 0], colors
 
 
-def perceptual_gradient(cmap, samples=256):
+def perceptual_gradient(cmap, samples=256, uniform_space=colorspacious.CAM02SCD):
     """
-    Compute the lightness gradient :math:`\Delta E_\text{CIEDE2000}` between consecutive colors of the colormap.
+    Compute the perceptual gradient :math:`\Delta E` between consecutive colors of the colormap.
 
     Parameters
     ----------
@@ -112,9 +113,162 @@ def perceptual_gradient(cmap, samples=256):
     """
     x = np.linspace(0, 1, samples)
     colors = cmap(x)
-    lab = _rgb2lab(colors[:, 0:3])
 
-    dE = np.sqrt(np.sum(np.gradient(lab, axis=0)**2, axis=1))
+    dE = colorspacious.deltaE(colors[0:-1, 0:3], colors[1:, 0:3], input_space='sRGB1', uniform_space=uniform_space)
+
+    return dE, np.cumsum(dE)
+
+
+def ciede2000(cmap, samples=256, kl=1, kc=1, kh=1):
+    """
+    Compute the perceptual gradient :math:`\Delta E_\text{CIEDE2000}` between consecutive colors of the colormap.
+
+    Parameters
+    ----------
+    cmap : colormap-like
+        Colormap-like object.
+    samples : int
+        Number of colors in the color gradient.
+
+    Returns
+    -------
+    lightness_gradient : ndarray(samples)
+        Lightness gradient values between consecutive colors in the colormap.
+    lightness_gradient_cumulative : ndarray(samples)
+       Cumulative lightness gradient values between consecutive colors in the colormap.
+    """
+    x = np.linspace(0, 1, samples)
+    colors = cmap(x)
+    lab = _rgb2cielab_converter(colors[:, 0:3])
+
+    L_prime = lab[0:-1, 0] * 0.5 + lab[1:, 0] * 0.5
+    C = np.sqrt(lab[:, 1]**2 + lab[:, 2]**2)
+    C_bar = C[0:-1] * 0.5 + C[1:] * 0.5
+    G = 0.5 * (1 - np.sqrt(C_bar**7 / (C_bar**7 + 25**7)))
+
+    a1_prime = lab[0:-1, 1] * (1 + G)
+    a2_prime = lab[1:, 1] * (1 + G)
+
+    C1_prime = np.sqrt(a1_prime**2 + lab[0:-1, 2]**2)
+    C2_prime = np.sqrt(a2_prime**2 + lab[1:, 2]**2)
+    C_prime_bar = C1_prime * 0.5 + C2_prime * 0.5
+
+    h1 = np.arctan2(lab[0:-1, 2], a1_prime)
+    h2 = np.arctan2(lab[1:, 2], a2_prime)
+    h1[h1 < 0] += 2 * np.pi
+    h2[h2 < 0] += 2 * np.pi
+
+    H_prime_bar = h1 * 0.5 + h2 * 0.5
+    H_prime_bar[np.abs(h1 - h2) > np.pi] += np.pi
+
+    T = 1 - 0.17 * np.cos(H_prime_bar - np.deg2rad(30)) + 0.24 * np.cos(2 * H_prime_bar) + 0.32 * np.cos(3 * H_prime_bar + np.deg2rad(6)) - 0.20 * np.cos(4 * H_prime_bar - np.deg2rad(63))
+
+    delta_h_prime = h2 - h1 - 2 * np.pi
+    delta_h_prime[np.abs(h1 - h2) <= np.pi] += 2 * np.pi
+    delta_h_prime[np.logical_and(np.abs(h1 - h2) > np.pi, h2 <= h1)] += 4 * np.pi
+
+    delta_L_prime = lab[1:, 0] - lab[0:-1, 0]
+    delta_C_prime = C2_prime - C1_prime
+    delta_H_prime = 2 * np.sqrt(C1_prime * C2_prime) * np.sin(delta_h_prime * 0.5)
+
+    S_L = 1 + (0.015 * (L_prime - 50)**2) / np.sqrt(20 + (L_prime - 50)**2)
+    S_C = 1 + 0.045 * C_prime_bar
+    S_H = 1 + 0.015 * C_prime_bar * T
+
+    delta_phi = np.deg2rad(30 * np.exp(-(((np.rad2deg(H_prime_bar) - 275) / 25)**2)))
+
+    R_C = 2 * np.sqrt(C_prime_bar**7 / (C_prime_bar**7 + 25**7))
+    R_T = -R_C * np.sin(2 * delta_phi)
+
+    dE = np.sqrt((delta_L_prime / (kl * S_L))**2 +
+                 + (delta_C_prime / (kc * S_C))**2 +
+                 + (delta_H_prime / (kh * S_H))**2 +
+                 + R_T * (delta_C_prime / (kc * S_C)) * (delta_H_prime / (kh * S_H)))
+
+    return dE, np.cumsum(dE)
+
+
+def testfun(cmap, samples=256):
+
+    import math
+
+    def CIEDE2000(Lab_1, Lab_2):
+        '''Calculates CIEDE2000 color distance between two CIE L*a*b* colors'''
+        C_25_7 = 6103515625 # 25**7
+
+        L1, a1, b1 = Lab_1[0], Lab_1[1], Lab_1[2]
+        L2, a2, b2 = Lab_2[0], Lab_2[1], Lab_2[2]
+        C1 = math.sqrt(a1**2 + b1**2)
+        C2 = math.sqrt(a2**2 + b2**2)
+        C_ave = (C1 + C2) / 2
+        G = 0.5 * (1 - math.sqrt(C_ave**7 / (C_ave**7 + C_25_7)))
+
+        L1_, L2_ = L1, L2
+        a1_, a2_ = (1 + G) * a1, (1 + G) * a2
+        b1_, b2_ = b1, b2
+
+        C1_ = math.sqrt(a1_**2 + b1_**2)
+        C2_ = math.sqrt(a2_**2 + b2_**2)
+
+        if b1_ == 0 and a1_ == 0: h1_ = 0
+        elif a1_ >= 0: h1_ = math.atan2(b1_, a1_)
+        else: h1_ = math.atan2(b1_, a1_) + 2 * math.pi
+
+        if b2_ == 0 and a2_ == 0: h2_ = 0
+        elif a2_ >= 0: h2_ = math.atan2(b2_, a2_)
+        else: h2_ = math.atan2(b2_, a2_) + 2 * math.pi
+
+        dL_ = L2_ - L1_
+        dC_ = C2_ - C1_
+        dh_ = h2_ - h1_
+        if C1_ * C2_ == 0: dh_ = 0
+        elif dh_ > math.pi: dh_ -= 2 * math.pi
+        elif dh_ < -math.pi: dh_ += 2 * math.pi
+        dH_ = 2 * math.sqrt(C1_ * C2_) * math.sin(dh_ / 2)
+
+        L_ave = (L1_ + L2_) / 2
+        C_ave = (C1_ + C2_) / 2
+
+        _dh = abs(h1_ - h2_)
+        _sh = h1_ + h2_
+        C1C2 = C1_ * C2_
+
+        if _dh <= math.pi and C1C2 != 0: h_ave = (h1_ + h2_) / 2
+        elif _dh  > math.pi and _sh < 2 * math.pi and C1C2 != 0: h_ave = (h1_ + h2_) / 2 + math.pi
+        elif _dh  > math.pi and _sh >= 2 * math.pi and C1C2 != 0: h_ave = (h1_ + h2_) / 2 - math.pi
+        else: h_ave = h1_ + h2_
+
+        T = 1 - 0.17 * math.cos(h_ave - math.pi / 6) + 0.24 * math.cos(2 * h_ave) + 0.32 * math.cos(3 * h_ave + math.pi / 30) - 0.2 * math.cos(4 * h_ave - 63 * math.pi / 180)
+
+        h_ave_deg = h_ave * 180 / math.pi
+        if h_ave_deg < 0: h_ave_deg += 360
+        elif h_ave_deg > 360: h_ave_deg -= 360
+        dTheta = 30 * math.exp(-(((h_ave_deg - 275) / 25)**2))
+
+        R_C = 2 * math.sqrt(C_ave**7 / (C_ave**7 + C_25_7))
+        S_C = 1 + 0.045 * C_ave
+        S_H = 1 + 0.015 * C_ave * T
+
+        Lm50s = (L_ave - 50)**2
+        S_L = 1 + 0.015 * Lm50s / math.sqrt(20 + Lm50s)
+        R_T = -math.sin(dTheta * math.pi / 90) * R_C
+
+        k_L, k_C, k_H = 1, 1, 1
+
+        f_L = dL_ / k_L / S_L
+        f_C = dC_ / k_C / S_C
+        f_H = dH_ / k_H / S_H
+
+        dE_00 = math.sqrt(f_L**2 + f_C**2 + f_H**2 + R_T * f_C * f_H)
+        return dE_00
+
+    x = np.linspace(0, 1, samples)
+    colors = cmap(x)
+    lab = _rgb2cielab_converter(colors[:, 0:3])
+
+    dE = np.empty(lab.shape[0] - 1)
+    for k in range(dE.size):
+        dE[k] = CIEDE2000(lab[k, :], lab[k + 1, :])
 
     return dE, np.cumsum(dE)
 
