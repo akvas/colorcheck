@@ -8,6 +8,6 @@ setup(
     version='0.1',
     author='Andreas Kvas',
     description='A python package to simulate color vision deficiency for scientific figures',
-    install_requires=['matplotlib', 'daltonlens'],
+    install_requires=['matplotlib', 'daltonlens', 'colorspacious'],
     packages=['colorcheck']
 )
