@@ -123,6 +123,8 @@ def ciede2000(cmap, samples=256, kl=1, kc=1, kh=1):
     """
     Compute the perceptual gradient :math:`\Delta E_\text{CIEDE2000}` between consecutive colors of the colormap.
 
+    Equations from http://www.brucelindbloom.com/index.html?Eqn_DeltaE_CIE2000.html.
+
     Parameters
     ----------
     cmap : colormap-like
