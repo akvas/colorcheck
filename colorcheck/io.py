@@ -1,5 +1,5 @@
 # This file is part of colorcheck
-# Copyright (C) 2022 Andreas Kvas
+# Copyright (C) 2022 - 2023 Andreas Kvas
 # See LICENSE for detailed licensing information.
 
 import matplotlib.colors
@@ -8,17 +8,14 @@ import os
 
 
 def writecpt(file_name, cmap, header=None):
-    """
-    Write a colormap to a cpt file, for use with GMT.
+    """Write a colormap to a cpt file, for use with GMT.
 
-    Parameters
-    ----------
-    file_name : str
-        Name of the file to write to.
-    cmap : colormap_like
-        Instance of a colormap-like class.
-    header : str or None
-        If given, write header lines to the file.
+    :param file_name: output file name
+    :type file_name: str
+    :param cmap: colormap instance or rgb(a) ndarray of shape (N, 3) or (N, 4)
+    :type cmap: Colormap, ndarray
+    :param header: Optional file header
+    :type header: str(, optional)
     """
     if isinstance(cmap, matplotlib.colors.Colormap):
         x = np.linspace(0, 1, cmap.N)

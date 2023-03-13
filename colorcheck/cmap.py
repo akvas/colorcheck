@@ -1,5 +1,5 @@
 # This file is part of colorcheck
-# Copyright (C) 2022 Andreas Kvas
+# Copyright (C) 2022 - 2023 Andreas Kvas
 # See LICENSE for detailed licensing information.
 
 import numpy as np
@@ -40,24 +40,18 @@ def is_colormap_like(cmap):
 
 
 def cmap_rgba(cmap, width=640, height=80, orientation='horizontal'):
-    """
-    Create an image-like rgb(a) array from a Colormap instance.
+    """Create an image-like rgb(a) array from a Colormap instance.
 
-    Parameters
-    ----------
-    cmap : colormap-like
-        Colormap-like object.
-    width : int
-        Width of the image array in pixels.
-    height : int
-        Height of the image array in pixels.
-    orientation : str
-        Orientiation of the colormap gradient. One of 'horizonal' (default) or 'vertical'.
-
-    Returns
-    -------
-    img_array : ndarray(width, height, color.dimension)
-        Array representation of the colormap of the given size and orientation.
+    :param cmap: Colormap-like object
+    :type cmap: colormap-like
+    :param width: Output array width in pixels, defaults to 640
+    :type width: int
+    :param height: Output array height in pixels, defaults to 80
+    :type height: int
+    :param orientation: Orientation of the color gradient ('horizontal', 'vertical')
+    :type orentiation: str
+    :return: Array representation of the colormap of the given size and orientation
+    :rtype: ndarray
     """
     x = np.linspace(0, 1, width)
     arr = np.tile(cmap(x)[:, np.newaxis, :], (1, height, 1))
@@ -67,49 +61,38 @@ def cmap_rgba(cmap, width=640, height=80, orientation='horizontal'):
     return arr
 
 
-def lightness(cmap, samples=256):
-    """
-    Compute the lightness for each color in the colormap. The computed lightness is based on
-    the CIECAM02-UCS color model.
+def lightness(cmap, samples=256, uniform_space=colorspacious.CAM02SCD):
+    """Compute the lightness for each color in the colormap.
 
-    Parameters
-    ----------
-    cmap : colormap-like
-        Colormap-like object.
-    samples : int
-        Number of colors in the color gradient.
-
-    Returns
-    -------
-    lightness : ndarray(samples)
-        Lightness values for each color in the colormap.
-    colors : ndarray(samples, color dimension)
-        RGB(A) values of the used colors. This is primarily useful for visualization purposes.
+    :param cmap: Colormap-like object
+    :type cmap: colormap-like
+    :param samples: Number of colors in the color gradient, defaults to 256
+    :type samples: int
+    :param uniform_space: Colorspace in which the lightness is computed, defaults to CAM02SCD
+    :type uniform_space: colorspacious color space
+    :return: lightness as ndarray(samples), rgb(a) values of the used colors. This is primarily useful for visualization purposes.
+    :rtype: ndarray(samples), ndarray(samples, color dimension)
     """
+    converter = colorspacious.cspace_converter('sRGB1', uniform_space)
     x = np.linspace(0, 1, samples)
     colors = cmap(x)
-    lab = _rgb2lab(colors[:, 0:3])
+    lab = converter(colors[np.newaxis, :, :3])[0, :, :]
 
     return lab[:, 0], colors
 
 
 def perceptual_gradient(cmap, samples=256, uniform_space=colorspacious.CAM02SCD):
-    """
-    Compute the perceptual gradient :math:`\Delta E` between consecutive colors of the colormap.
+    """Compute the perceptual gradient :math:`\Delta E` between consecutive colors of the colormap.
 
-    Parameters
-    ----------
-    cmap : colormap-like
-        Colormap-like object.
-    samples : int
-        Number of colors in the color gradient.
+    :param cmap: Colormap-like object
+    :type cmap: colormap-like
+    :param samples: Number of colors in the color gradient, defaults to 256
+    :type samples: int
+    :param uniform_space: Colorspace in which the lightness is computed, defaults to CAM02SCD
+    :type uniform_space: colorspacious color space
 
-    Returns
-    -------
-    lightness_gradient : ndarray(samples)
-        Lightness gradient values between consecutive colors in the colormap.
-    lightness_gradient_cumulative : ndarray(samples)
-       Cumulative lightness gradient values between consecutive colors in the colormap.
+    :return: Perceptual gradient values between consecutive colors in the colormap., Cumulative perceptual gradient values between consecutive colors in the colormap.
+    :rtype: ndarray(samples), ndarray(samples)
     """
     x = np.linspace(0, 1, samples)
     colors = cmap(x)
@@ -120,24 +103,23 @@ def perceptual_gradient(cmap, samples=256, uniform_space=colorspacious.CAM02SCD)
 
 
 def ciede2000(cmap, samples=256, kl=1, kc=1, kh=1):
-    """
-    Compute the perceptual gradient :math:`\Delta E_\text{CIEDE2000}` between consecutive colors of the colormap.
+    """Compute the perceptual gradient :math:`\Delta E_\text{CIEDE2000}` between consecutive colors of the colormap.
 
     Equations from http://www.brucelindbloom.com/index.html?Eqn_DeltaE_CIE2000.html.
 
-    Parameters
-    ----------
-    cmap : colormap-like
-        Colormap-like object.
-    samples : int
-        Number of colors in the color gradient.
+    :param cmap: Colormap-like object
+    :type cmap: colormap-like
+    :param samples: Number of colors in the color gradient, defaults to 256
+    :type samples: int
+    :param kl: weighting factor kl, defaults to 1
+    :type kl: float
+    :param kc weighting factor kc, defaults to 1
+    :type kc: float
+    :param kh: weighting factor kh, defaults to 1
+    :type kh: float
 
-    Returns
-    -------
-    lightness_gradient : ndarray(samples)
-        Lightness gradient values between consecutive colors in the colormap.
-    lightness_gradient_cumulative : ndarray(samples)
-       Cumulative lightness gradient values between consecutive colors in the colormap.
+    :return: Perceptual gradient values between consecutive colors in the colormap., Cumulative perceptual gradient values between consecutive colors in the colormap.
+    :rtype: ndarray(samples), ndarray(samples)
     """
     x = np.linspace(0, 1, samples)
     colors = cmap(x)
@@ -191,7 +173,15 @@ def ciede2000(cmap, samples=256, kl=1, kc=1, kh=1):
 
 
 def replace_lightness(cmap, lightness_curve):
+    """Replace the lightness curve in a colormap with a new one.
 
+    :param cmap: Colormap-like object
+    :type cmap: colormap-like
+    :param lightness_curve: new lightness curve
+    :type lightness_curve: ColormapLightness
+    :return: Colormap with new lightness curve
+    :rtype: colormap-like
+    """
     x = np.linspace(0, 1, cmap.N)
     rgba = cmap(x)
     lab = _rgb2lab(rgba[:, 0:3])
@@ -230,20 +220,14 @@ def replace_lightness(cmap, lightness_curve):
 
 
 def equalize_cmap(cmap, metric='lightness'):
-    """
-    Equalize the percetual gradient of a colormap.
+    """Equalize the perceptual gradient of a colormap.
 
-    Parameters
-    ----------
-    cmap : colormap-like
-        Colormap-like object.
-    metric : str
-        The metric used to linearize the perception. One of ('lightness', 'CIE76').
-
-    Returns
-    -------
-    cmap_equalized : colormap-like
-        The equalized colormap.
+    :param cmap: Colormap-like object
+    :type cmap: colormap-like
+    :param metric: The metric used to linearize the perception. One of ('lightness', 'CIE76'
+    :type metric: str
+    :return: Colormap with equalized perceptual gradient
+    :rtype: colormap-like
     """
     x = np.linspace(0, 1, cmap.N)
     colors = cmap(x)
@@ -270,26 +254,20 @@ def equalize_cmap(cmap, metric='lightness'):
 
 
 def cmapshow(cmap, ax=None, width=640, height=80, orientation='horizontal'):
-    """
-    Convenience function for displaying colormaps in an existing axes instance.
+    """Convenience function for displaying colormaps in an existing axes instance.
 
-    Parameters
-    ----------
-    cmap : colormap-like
-        Colormap-like object.
-    ax : Axes object or None
-        Axes into which the colormap is drawn. If None, the currently active axes are used.
-    width : int
-        Width of the image array in pixels.
-    height : int
-        Height of the image array in pixels.
-    orientation : str
-        Orientiation of the colormap gradient. One of 'horizonal' (default) or 'vertical'.
-
-    Returns
-    -------
-    im : mappable
-        The mappable returned by imshow.
+    :param cmap: Colormap-like object
+    :type cmap: colormap-like
+    :param ax: Axes into which the colormap is drawn. If None, the currently active axes are used
+    :type ax: Axes object or None
+    :param width: Output array width in pixels, defaults to 640
+    :type width: int
+    :param height: Output array height in pixels, defaults to 80
+    :type height: int
+    :param orientation: Orientation of the color gradient ('horizontal', 'vertical')
+    :type orentiation: str
+    :return: mappable generated by imshow
+    :rtype: mappable
     """
     if ax is None:
         ax = matplotlib.pyplot.gca()
@@ -308,10 +286,8 @@ class ColormapLightness:
         """
         Return the lightness value for a given color index.
 
-        Parameters
-        ----------
-        x : float
-            Color index in the range [0, 1].
+        :param x: evaluation point (0, 1)
+        :type x: float
         """
         return self._lightness_map(x)
 
