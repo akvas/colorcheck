@@ -49,3 +49,17 @@ def flip_lightness(img, preserve_colors=False, reduce_darkness=0.1, darkness_thr
         rgb[~background] = im_orig[~background]
 
     return rgb
+
+
+def hex2rgb(hex_color):
+    """Convert hex color(s) to RGB in the range 0 - 1.
+
+    :param hex_color: hex color string or list of hex color strings
+    :type img: str or list
+    :return rgb_color: RGB color tuple in the range 0 - 1 or list of RGB color tuples
+    :rtype tuple or list of tuples:
+    """
+    if isinstance(hex_color, str):
+        return tuple(int(hex_color[i:i + 2], 16) / 255 for i in (1, 3, 5))
+    else:
+        return [hex2rgb(hk) for hk in hex_color]
