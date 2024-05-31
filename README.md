@@ -1,11 +1,16 @@
 # colorcheck
 
-colorcheck is a simple tool to simulate color vision deficiency (CVD) in images and colormaps.
+colorcheck is a simple tool to simulate color vision deficiency (CVD) in images and colormaps and change/flip lightness in images to convert between light and dark themes.
 Running
 ```
 python -m colorcheck input_image.png
 ```
 will simulate the effect of Deuteranopia, Protanopia, Tritanopia, and Monochromacy for the given image.
+Running
+```
+python -m colorcheck.invert input_image.png
+```
+will flip the ligthness in the given image, converting between light and dark themes.
 
 ## Installation
 
