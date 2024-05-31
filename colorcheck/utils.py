@@ -18,7 +18,7 @@ def flip_lightness(img, preserve_colors=False, reduce_darkness=0.1, darkness_thr
     :type preserve_colors: bool(, optional)
     :param reduce_darkness: Increase the overall figure lightness (0 - 1), defaults to 0.1
     :type reduce_darkness: float(, optional)
-    :param darkness_threshold: If reduce_darkness is non-zero, this parameter in the range (0 - 1) governs which pixels are presumed dark, defaults to 6.
+    :param darkness_threshold: If reduce_darkness is non-zero, this parameter in the range (0 - 100) governs which pixels are presumed dark, defaults to 6.
     :type darkness_threshold: float
     :return im_modified: Modified image as rgb(a) array.
     :rtype ndarray:
