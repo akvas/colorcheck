@@ -15,7 +15,10 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    img = matplotlib.pyplot.imread(args.image)
+    try:
+        img = matplotlib.pyplot.imread(args.image, format='png')
+    except SyntaxError:
+        img = matplotlib.pyplot.imread(args.image) / 255
 
     for cvd_type in ('deutan', 'protan', 'tritan', 'mono'):
 
