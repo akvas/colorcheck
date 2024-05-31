@@ -1,5 +1,5 @@
 # This file is part of colorcheck
-# Copyright (C) 2023 Andreas Kvas
+# Copyright (C) 2023 - 2024 Andreas Kvas
 # See LICENSE for detailed licensing information.
 
 import numpy as np
